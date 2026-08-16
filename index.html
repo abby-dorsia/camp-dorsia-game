@@ -1136,12 +1136,18 @@
     p.y = Math.max(40, Math.min(WORLD_H - 60, p.y));
 
     // the banquet tables are solid — stay in the aisle between them, except at the
-    // empty seat's own row, where a pocket opens up so you can actually pull into it
+    // empty seat's own row, where a pocket opens up so you can actually pull into it.
+    // SEAT_POCKET_Y_HALF is deliberately wider than SEAT_WIN_TOL (below) so the pocket
+    // is fully open well before you're close enough to win, and the reachable x lands
+    // comfortably inside the win tolerance rather than right on its edge — on a touch
+    // d-pad you usually can't hold two directions at once, so this needs real slack,
+    // not a razor-thin window, or lining up feels like it "won't let you in."
     if (p.y > BANQUET.tableY0 && p.y < BANQUET.tableY1) {
       var aisleL = BANQUET.tableLeftX + BANQUET.tableHalfW + 6;
       var aisleR = BANQUET.tableRightX - BANQUET.tableHalfW - 6 - p.w;
-      if (Math.abs(p.y - EMPTY_SEAT.y) < BANQUET.seatSpacing / 2) {
-        aisleR = Math.max(aisleR, EMPTY_SEAT.x - p.w / 2 + 8);
+      var SEAT_POCKET_Y_HALF = 26;
+      if (Math.abs(p.y - EMPTY_SEAT.y) < SEAT_POCKET_Y_HALF) {
+        aisleR = Math.max(aisleR, EMPTY_SEAT.x + 10 - p.w / 2);
       }
       p.x = Math.max(aisleL, Math.min(aisleR, p.x));
     }
@@ -1200,10 +1206,11 @@
       g.natePookieShown = true;
     }
 
-    // Abby's saved seat
+    // Abby's saved seat — shown at the bottom, same as the obstacle callouts,
+    // instead of the top flash message
     if (!g.abbyGreeted && Math.abs(p.y - BANQUET.abby.y) < 20) {
       g.abbyGreeted = true;
-      g.flashMsg = 'ABBY SAVED YOU A SEAT'; g.flashT = 1.6;
+      g.bottomMsg = 'Find your seat!'; g.bottomMsgT = 2.6;
     }
 
     // sprinklers — brief exposure just slows you (soakTimer), but lingering in the
@@ -1270,7 +1277,8 @@
     // win condition: actually pulled into the empty seat Abby saved him, not just
     // level with its row — has to reach it in x too, since the aisle no longer
     // funnels you past it without stepping into the pocket
-    if (Math.abs(p.y - EMPTY_SEAT.y) < 16 && Math.abs((p.x + p.w / 2) - EMPTY_SEAT.x) < 16) {
+    var SEAT_WIN_TOL = 22;
+    if (Math.abs(p.y - EMPTY_SEAT.y) < SEAT_WIN_TOL && Math.abs((p.x + p.w / 2) - EMPTY_SEAT.x) < SEAT_WIN_TOL) {
       state = STATE.WIN;
     }
 
