@@ -31,7 +31,7 @@
     color: var(--cream);
     margin: 0;
     min-height: 100vh;
-    padding: 24px 14px 40px;
+    padding: 12px 12px 14px;
     font-family: Georgia, 'Iowan Old Style', 'Palatino Linotype', serif;
   }
 
@@ -48,12 +48,26 @@
   }
 
   .rig {
+    /* Normally 380px wide, same as always. But on a short mobile viewport (address
+       bar eating vertical space, small phone, etc.) the full-width game board plus
+       the d-pad below it can be taller than what's visible on load, pushing the
+       controls off-screen with no visual hint to scroll. This shrinks the whole rig
+       — proportionally, so the board keeps its aspect ratio — only when needed to
+       keep the d-pad on-screen from the first frame. 260px is everything in .rig
+       *except* the game frame (tag row + gaps + frame's own border/padding + the
+       d-pad row + footer); 0.6 is the frame's fixed width:height ratio (384:640);
+       28px is the frame's own border+padding eating into that width. Tune the 260
+       if the surrounding chrome changes size.
+       Fallback line first (plain 380px cap) for browsers without dvh support in
+       calc() — if the second declaration is invalid there, it's dropped and this
+       one stands. */
     width: min(100%, 380px);
+    width: min(100%, 380px, calc((100dvh - 260px) * 0.6 + 28px));
     margin: 0 auto;
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 14px;
+    gap: 10px;
   }
 
   .tag-row {
@@ -202,7 +216,11 @@
   }
 
   @media (min-width: 480px) {
+    /* Same height-aware cap as the base rule — without it, a short-but-wide window
+       (landscape phone, a small resized desktop browser) would hit this fixed 380px
+       and reintroduce the off-screen-d-pad bug the base rule exists to prevent. */
     .rig { width: 380px; }
+    .rig { width: min(380px, calc((100dvh - 260px) * 0.6 + 28px)); }
   }
 </style>
 
@@ -330,7 +348,7 @@
     { x: LANE_L,              y: 3550, w: LANE_R - LANE_L - GRAVEL_GAP, h: 70 }  // gap on right
   ];
 
-  var SUNGLASSES = { x: 300, y: 2940, w: 20, h: 12, taken: false };
+  var BEER = { x: 300, y: 2940, w: 20, h: 12 };
 
   var ARCHERY_LANES = [3100, 3020, 2940, 2860, 2780];
 
@@ -468,15 +486,15 @@
     return {
       player: {
         x: 192, y: 3800, w: 24, h: 36, soakTimer: 0, boostTimer: 0, arrowCooldown: 0,
-        facing: 1, animT: 0, moving: false, gravelTimer: 0, arrowHits: 0, sprayExposure: 0
+        drunkTimer: 0, facing: 1, animT: 0, moving: false, gravelTimer: 0, arrowHits: 0, sprayExposure: 0
       },
       camY: 0,
       time: TOTAL_TIME,
-      sunglasses: false,
+      beerTaken: false,
       gummiesTaken: false,
       abbyGreeted: false,
       natePookieShown: false,
-      alyssa: { x: 192, vx: 44, noticed: false },
+      alyssa: { x: 192, vx: 44, noticed: false, evaded: false, chaseTime: 0 },
       nate: { x: NATE.x, vx: NATE_PATROL_SPEED },
       sprinklers: SPRINKLERS.map(function (s) { return { on: s.on, timer: s.timer }; }),
       seenZoneMsg: {},
@@ -761,14 +779,14 @@
     r(x + 19, y - 2, 4, 7, PAL.arrowMetal);
   }
 
-  function drawSunglasses(sg, camY) {
-    if (sg.taken) return;
-    var sy = worldToScreen(sg.y, camY);
-    r(sg.x, sy, 20, 3, '#1a1a1a');
-    circ(sg.x + 5, sy + 1, 5, '#1a1a1a');
-    circ(sg.x + 15, sy + 1, 5, '#1a1a1a');
-    r(sg.x + 3, sy - 1, 4, 3, PAL.gold);
-    r(sg.x + 13, sy - 1, 4, 3, PAL.gold);
+  function drawBeer(x, sy, taken) {
+    if (taken) return;
+    r(x + 7, sy - 14, 6, 8, '#3a2a14');
+    r(x + 6, sy - 15, 8, 3, '#c9a24a');
+    r(x + 3, sy - 6, 14, 20, '#8a5a1e');
+    r(x + 3, sy - 6, 14, 3, '#a06e2a');
+    r(x + 5, sy - 3, 3, 14, 'rgba(255,255,255,0.28)');
+    r(x + 4, sy + 12, 12, 2, '#5a3a12');
   }
 
   function drawSprinkler(s, sx, sy, on, sprayPhase) {
@@ -1110,13 +1128,15 @@
     var baseSpeed = 85;
     if (p.soakTimer > 0) p.soakTimer -= dt;
     if (p.boostTimer > 0) p.boostTimer -= dt;
+    if (p.drunkTimer > 0) p.drunkTimer -= dt;
     var soakMul = p.soakTimer > 0 ? 0.6 : 1;
     var boostMul = p.boostTimer > 0 ? 1.6 : 1;
+    var drunkMul = p.drunkTimer > 0 ? 0.65 : 1;
 
     var inGravel = GRAVEL_PATCHES.some(function (pt) {
       return p.x + p.w > pt.x && p.x < pt.x + pt.w && p.y > pt.y && p.y < pt.y + pt.h;
     });
-    var speedMul = soakMul * boostMul * (inGravel ? 0.68 : 1);
+    var speedMul = soakMul * boostMul * drunkMul * (inGravel ? 0.68 : 1);
 
     // gravel slows you down on contact, but too much cumulative time on it across the
     // driveway breaks a heel — the timer only resets once you clear the whole zone,
@@ -1157,24 +1177,39 @@
 
     if (g.flashT > 0) g.flashT -= dt;
 
-    // sunglasses pickup
-    if (!g.sunglasses) {
-      var sgWorldY = SUNGLASSES.y;
-      if (Math.abs(p.y - sgWorldY) < 24 && Math.abs(p.x - SUNGLASSES.x) < 24) {
-        g.sunglasses = true;
-        g.flashMsg = 'SUNGLASSES +STYLE'; g.flashT = 1.4;
+    // beer pickup — slows you down (drunk) instead of any bonus
+    if (!g.beerTaken) {
+      if (Math.abs(p.y - BEER.y) < 24 && Math.abs(p.x - BEER.x) < 24) {
+        g.beerTaken = true;
+        p.drunkTimer = 4;
+        g.bottomMsg = 'That Beer Made Everything a Bit Foggy'; g.bottomMsgT = 2.6;
       }
     }
 
-    // Alyssa AI (active while player is within her zone)
+    // Alyssa AI (active while player is within her zone). Once noticed, she used to
+    // pure-pursue your x forever with no way to shake her — on a one-finger-at-a-time
+    // touch d-pad you can't move diagonally to build sideways separation while also
+    // making y progress, so once she locked on it was effectively unbeatable, and
+    // people naturally try to juke sideways rather than just running straight through.
+    // A distance-based "shake her off" doesn't reliably work here — how much sideways
+    // room you actually have when she notices you is down to luck of where you are in
+    // the lane relative to her, and if you're not near the middle it's easy to end up
+    // pinned against a wall with no more room to retreat. A TIME-based give-up is
+    // robust regardless of that geometry: survive being chased for a couple of
+    // seconds (whatever you do — juke, retreat, whatever) and she loses interest.
+    // Once she's genuinely lost you, she stays off your back for the rest of this
+    // same pass through her zone (her "active" range is a long ~840-unit corridor,
+    // too long for a short cooldown to matter — it needs to be a real reset).
     var a = g.alyssa;
     if (p.y > ZONES.alyssa.y0 - 120 && p.y < ZONES.alyssa.y1 + 120) {
       var alyssaWorldY = (ZONES.alyssa.y0 + ZONES.alyssa.y1) / 2;
       var dPlayer = Math.hypot(p.x - a.x, p.y - alyssaWorldY);
-      if (dPlayer < 110) { a.noticed = true; }
+      if (dPlayer < 110 && !a.evaded && !a.noticed) { a.noticed = true; a.chaseTime = 0; }
       if (a.noticed) {
         var chDx = p.x - a.x;
-        a.x += Math.sign(chDx) * 62 * dt;
+        a.x += Math.sign(chDx) * 34 * dt;
+        a.chaseTime += dt;
+        if (a.chaseTime > 2.2) { a.noticed = false; a.evaded = true; } // lost you for good, this pass
       } else {
         a.x += a.vx * dt;
         if (a.x < LANE_L + 20 || a.x > LANE_R - 40) a.vx *= -1;
@@ -1185,6 +1220,7 @@
       }
     } else {
       a.noticed = false;
+      a.evaded = false; // clear of her territory entirely — a fresh approach next time
     }
 
     // Nate patrols back and forth around his spot
@@ -1369,7 +1405,7 @@
     // archery range
     drawArcheryRange(camY);
     if (g.arrows) g.arrows.forEach(function (arw) { drawArrow(arw.x, worldToScreen(arw.y, camY), arw.flying); });
-    drawSunglasses({ x: SUNGLASSES.x, y: SUNGLASSES.y, taken: g.sunglasses }, camY);
+    drawBeer(BEER.x, worldToScreen(BEER.y, camY), g.beerTaken);
 
     // Nate
     var nateSY = worldToScreen(NATE.y, camY);
@@ -1482,7 +1518,16 @@
     else if (state === STATE.PLAY) renderPlay();
     else if (state === STATE.WIN) renderEnd('YOU MADE IT', "Made it just in time! Let's eat.", PAL.gold, null);
     else if (state === STATE.BUSTED) renderEnd('BUSTED!', "Alyssa: “Where do you think you're going?”", PAL.ember, null);
-    else if (state === STATE.LATE) renderEnd('CAUGHT!', 'Marc opens his speech with a joke about your outfit.', PAL.ember, null);
+    else if (state === STATE.LATE) {
+      // "Caught!" only makes sense if you actually got close enough to be seen
+      // arriving late — if the clock ran out before you even reached the banquet
+      // zone (tables not yet in view), that framing doesn't fit.
+      if (game && game.player.y < ZONES.banquet.y1) {
+        renderEnd('CAUGHT!', 'Marc opens his speech with a joke about your outfit.', PAL.ember, null);
+      } else {
+        renderEnd('GAME OVER', 'Dinner started without you.', PAL.ember, null);
+      }
+    }
     else if (state === STATE.HEEL) renderEnd('GAME OVER', 'You broke a heel!', PAL.ember, null);
     else if (state === STATE.SHOT) renderEnd('GAME OVER', 'Someone call a medic.', PAL.ember, null);
     else if (state === STATE.SOAKED) renderEnd('GAME OVER', 'Back to the outfit drawing board.', PAL.ember, null);
