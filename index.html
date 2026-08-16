@@ -1091,7 +1091,7 @@
     clock += dt;
     if (state === STATE.INTRO) {
       introTimer += dt;
-      if (introTimer > 1.3) { introTimer = 0; introIdx++; if (introIdx >= introLines.length) state = STATE.PLAY; }
+      if (introTimer > 1.9) { introTimer = 0; introIdx++; if (introIdx >= introLines.length) state = STATE.PLAY; }
       return;
     }
     if (state !== STATE.PLAY) return;
@@ -1304,9 +1304,9 @@
       ctx.drawImage(LOGO.img, cx - s / 2, cy - s / 2, s, s);
     }
     ctx.textAlign = 'center';
-    ctx.font = 'bold 14px monospace';
+    ctx.font = 'bold 18px monospace';
     ctx.fillStyle = PAL.ember;
-    ctx.fillText("HUSEIN'S MAD DASH", cx, cy + 158);
+    ctx.fillText("HUSEIN'S MAD DASH", cx, cy + 160);
     if (Math.floor(clock * 2) % 2 === 0) {
       ctx.fillStyle = PAL.cream;
       ctx.font = '14px monospace';
