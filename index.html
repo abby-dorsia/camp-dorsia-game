@@ -595,10 +595,10 @@
     r(x + 9, by + 1, 8, 4, PAL.skin);
     r(x + 9, by + 4, 8, 1, PAL.gold);
     circ(x + 13, by + 6, 1.6, PAL.gold);
-    // head
+    // head — flat, no jaw/chin shading (same call Alyssa's face design made: a
+    // shaded band right where the mouth sits reads as the mouth floating below
+    // the chin instead of sitting on the face)
     r(x + 5, by - 14, 16, 16, PAL.skin);
-    dither(x + 5, by - 3, 16, 2, PAL.skin, PAL.skinShadow);
-    r(x + 5, by - 1, 16, 2, PAL.skinShadow);
     r(x + 12, by - 7, 1, 4, PAL.skinShadow);
     // eyebrows + eyes + mouth — sized to actually read at real gameplay scale, not just
     // technically present (a 3x1 brow / 1x1 catchlight turned out invisible in motion)
