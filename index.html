@@ -599,7 +599,10 @@
     // shaded band right where the mouth sits reads as the mouth floating below
     // the chin instead of sitting on the face)
     r(x + 5, by - 14, 16, 16, PAL.skin);
-    r(x + 12, by - 7, 1, 4, PAL.skinShadow);
+    // nose: sits in the gap between the eyes (end at by-2) and mouth (starts at
+    // by) — it used to start at by-7, the same row as the eyebrows, so it read
+    // as a streak sprouting from eyebrow height instead of an actual nose
+    r(x + 12, by - 2, 1, 2, PAL.skinShadow);
     // eyebrows + eyes + mouth — sized to actually read at real gameplay scale, not just
     // technically present (a 3x1 brow / 1x1 catchlight turned out invisible in motion)
     var flip = facing < 0;
